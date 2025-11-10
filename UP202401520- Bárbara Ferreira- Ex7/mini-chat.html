@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Video chat </title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #eeeded;
+      margin: 0;
+      padding: 20px;
+      max-width: 1000px;
+      margin-inline: auto;
+     justify-content: center;
+  
+    }
+    h1 { margin-top: 0; }
+    .videos {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .video-box { text-align: center; }
+    video {
+      width: 320px;
+      height: 240px;
+      background: #000;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #8ece2f;
+      color: white;
+      font-size: 14px;
+      margin: 4px 0;
+    }
+    button:disabled {
+      background: #999;
+      cursor: default;
+    }
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 6px;
+      box-sizing: border-box;
+      border-radius: 6px;
+      margin-top: 4px;
+    }
+    .box {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    #offerOut { background: #e5ffe5; }
+    #remoteSDP { background: #fff9e5; }
+    #answerOut { background: #e5f0ff; }
+    small { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Chat de Video </h1>
+  <p>
+    Abrir a página em <b>dois separadores</b> A e B e seguir os passos. 
+  </p>
+
+  <div class="videos">
+    <div class="video-box">
+      <h2>Vídeo </h2>
+      <video id="localVideo" autoplay playsinline muted></video><br>
+      <button id="startBtn">1. Iniciar câmara</button>
+    </div>
+    <div class="video-box">
+      <h2>Peer remoto</h2>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+  </div>
+
+  <div class="box">
+    <b>2. Criar OFERTA (faze apenas num dos separadores)</b><br>
+    <button id="offerBtn">2. Criar OFERTA</button><br>
+    <small>Quando aparecer texto aqui, copia e cola no outro separador.</small>
+    <textarea id="offerOut" placeholder="A oferta (SDP) vai aparecer aqui..."></textarea>
+  </div>
+
+  <div class="box">
+    <b>3. Colar descrição remota (OFERTA ou RESPOSTA)</b><br>
+    <small>
+      No separador B: cola aqui a OFERTA recebida e carrega em
+      “Usar oferta remota + criar RESPOSTA”.<br>
+      Depois copia a RESPOSTA gerada e cola no separador A.
+    </small>
+    <textarea id="remoteSDP" placeholder="Cola aqui a descrição remota (JSON)"></textarea><br>
+    <button id="useOfferBtn">3. Usar oferta remota + criar RESPOSTA</button>
+    <button id="useAnswerBtn">4. Usar resposta remota</button>
+  </div>
+
+  <div class="box">
+    <b>Resposta gerada neste separador</b><br>
+    <small>Copia este texto para o outro separador.</small>
+    <textarea id="answerOut" placeholder="A resposta (SDP) vai aparecer aqui..."></textarea>
+  </div>
+
+  <script>
+    const startBtn      = document.getElementById('startBtn');
+    const offerBtn      = document.getElementById('offerBtn');
+    const useOfferBtn   = document.getElementById('useOfferBtn');
+    const useAnswerBtn  = document.getElementById('useAnswerBtn');
+
+    const localVideo    = document.getElementById('localVideo');
+    const remoteVideo   = document.getElementById('remoteVideo');
+    const offerOut      = document.getElementById('offerOut');
+    const remoteSDP     = document.getElementById('remoteSDP');
+    const answerOut     = document.getElementById('answerOut');
+
+    let localStream = null;
+    let pc = null;
+
+    async function startLocal() {
+      if (localStream) return;
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+        localVideo.srcObject = localStream;
+        setupPeerConnection();
+        startBtn.disabled = true;
+      } catch (err) {
+        console.error(err);
+        alert('Não foi possível aceder à câmara/microfone.');
+      }
+    }
+
+    function setupPeerConnection() {
+      pc = new RTCPeerConnection();
+  
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+      // Mostrar vídeo remoto
+      pc.ontrack = event => {
+        if (!remoteVideo.srcObject) {
+          remoteVideo.srcObject = event.streams[0];
+        }
+      };
+
+      // Quando a recolha de ICE termina (candidate == null), exportamos a descrição local
+      pc.onicecandidate = event => {
+        if (!event.candidate && pc.localDescription) {
+          if (pc.localDescription.type === 'offer') {
+            offerOut.value = JSON.stringify(pc.localDescription);
+          } else if (pc.localDescription.type === 'answer') {
+            answerOut.value = JSON.stringify(pc.localDescription);
+          }
+        }
+      };
+    }
+
+    async function createOffer() {
+      if (!pc) {
+        alert('Primeiro clica em "Iniciar câmara local".');
+        return;
+      }
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+    }
+
+    async function useRemoteOfferCreateAnswer() {
+      if (!pc) {
+        alert('Primeiro clica em "Iniciar câmara local".');
+        return;
+      }
+      const text = remoteSDP.value.trim();
+      if (!text) {
+        alert('Cola primeiro a OFERTA recebida.');
+        return;
+      }
+      try {
+        const remoteDesc = new RTCSessionDescription(JSON.parse(text));
+        await pc.setRemoteDescription(remoteDesc);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        // O texto final aparece em answerOut quando ICE acabar.
+      } catch (err) {
+        console.error(err);
+        alert('Descrição remota inválida (verifica se copiaste tudo).');
+      }
+    }
+
+    async function useRemoteAnswer() {
+      if (!pc) {
+        alert('Primeiro clica em "Iniciar câmara local".');
+        return;
+      }
+      const text = remoteSDP.value.trim();
+      if (!text) {
+        alert('Cola primeiro a RESPOSTA recebida.');
+        return;
+      }
+      try {
+        const remoteDesc = new RTCSessionDescription(JSON.parse(text));
+        await pc.setRemoteDescription(remoteDesc);
+        alert('Resposta aplicada. Espera alguns segundos para o vídeo aparecer.');
+      } catch (err) {
+        console.error(err);
+        alert('Descrição remota inválida (verifica se copiaste tudo).');
+      }
+    }
+
+    startBtn.addEventListener('click', startLocal);
+    offerBtn.addEventListener('click', createOffer);
+    useOfferBtn.addEventListener('click', useRemoteOfferCreateAnswer);
+    useAnswerBtn.addEventListener('click', useRemoteAnswer);
+  </script>
+</body>
+</html>
+

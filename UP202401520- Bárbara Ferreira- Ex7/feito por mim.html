@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sobre mim</title>
+  <link rel="stylesheet" href="estilo2.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="titulo">
+      <h1>Olá, conecta-te!</h1>
+    </div>
+
+    <img src="foto .jpg" alt="Foto de perfil" class="foto-perfil">
+
+    <div class="grid-layout">
+      <div class="galeria-container">
+        <h4>Os meus hobbies</h4>
+        <div class="galeria-imagem-wrapper">
+          <img src="" alt="Imagem da galeria" id="imagem-galeria">
+          <p id="texto-galeria"></p>
+        </div>
+        <div class="galeria-controles">
+          <button id="anterior">« Anterior</button>
+          <button id="proximo">Próximo »</button>
+        </div>
+      </div>
+
+      <div id="canvas-container2" style="text-align:center;">
+        <button id="botaoMic" 
+          style="background:#4d7c0f; /* Verde Escuro */
+          color:white;
+          padding:8px 12px;
+          border:none;
+          border-radius:6px;
+          cursor:pointer;
+          margin-bottom: 8px;">
+          Ligar microfone
+        </button>
+        <p id="estadoMic" style="color:#617342; /* Verde Médio */ margin: 0;">Microfone desligado</p>
+        <canvas id="tela" width="300" height="200" 
+          style="background:white; /* Fundo do Canvas Branco */
+          border-radius:10px;
+          margin-top:10px;
+          box-shadow:0 4px 12px rgba(0,0,0,0.2);"></canvas>
+        <p style="color:#4d7c0f; /* Verde Escuro */ margin-top:8px;font-style:italic;">
+          Fale para ver a magia acontecer!
+        </p>
+      </div>
+      
+      <div id="canvas-container">
+        <button id="clear-btn">Limpar Desenho</button>
+      </div>
+      
+      <div class="links-container">
+        <div>
+          <p>Instagram</p>
+          <a href="https://www.instagram.com/pray4colours/" target="_blank">
+            <img src="instagram.jpg" alt="instagram">
+          </a>
+        </div>
+        <div>
+          <p>Spotify</p>
+          <a href="#" target="_blank">
+            <img src="images.png" alt="spotify">
+          </a>
+        </div>
+        <div>
+          <p>Cor Favorita</p>
+          <a href="#">
+            <img src="cores.gif" alt="cores">
+          </a>
+        </div>
+      </div>
+    </div>
+   <iframe src="webcam2.html" class="webcam-frame">
+   
+  </iframe>
+
+  <div class="audio-video-container">
+  <iframe
+    src="mini-chat.html"
+    class="webcam-frame"
+    allow="camera; microphone"
+    title="Mini Video Chat">
+  </iframe>
+  
+</div>
+<div style="text-align:center; margin-top: 2rem;">
+  <p style="color:#4d7c0f; font-style:italic;">
+    ⚠️ Este jogo só pode ser jogado no telemóvel.
+  </p>
+  <iframe 
+    src="labirinto.html" 
+    style="width: 420px; height: 720px; border:none; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,0.25); background:white;">
+  </iframe>
+</div>
+
+    <div class="final">
+      <h3>Criado com ❤</h3>
+    </div>
+  </div>
+
+  <script>
+    //  GALERIA 
+    const dadosGaleria = [
+      { src: "https://i.pinimg.com/736x/9f/af/a4/9fafa444af037b29e42b871838a8f9f3.jpg", 
+      texto: "Ler, principalmente no meio da natureza ❀" },
+      { src: "https://i.pinimg.com/736x/d1/c6/e8/d1c6e88af3b89b389d9fe5f83e2fdc12.jpg", 
+      texto: "Jogar joguinhos fixes (ou nem por isso)" },
+      { src: "https://i.pinimg.com/1200x/bb/04/ac/bb04aca1b2ff2cf26a1576e4081238d5.jpg", 
+      texto: "Desenhar, pintar... produzir arte" }
+    ];
+    
+    let imagemAtual = 0;
+    const imagemElemento = document.getElementById("imagem-galeria");
+    const textoElemento = document.getElementById("texto-galeria");
+    function mostrarImagem() {
+      const item = dadosGaleria[imagemAtual];
+      imagemElemento.src = item.src;
+      textoElemento.textContent = item.texto;
+    }
+    document.getElementById("proximo").addEventListener("click", () => {
+      imagemAtual = (imagemAtual + 1) % dadosGaleria.length;
+      mostrarImagem();
+    });
+    document.getElementById("anterior").addEventListener("click", () => {
+      imagemAtual = (imagemAtual - 1 + dadosGaleria.length) % dadosGaleria.length;
+      mostrarImagem();
+    });
+    mostrarImagem();
+
+    // --- MICROFONE---
+    const botaoMic = document.getElementById("botaoMic");
+    const estadoMic = document.getElementById("estadoMic");
+    const tela = document.getElementById("tela");
+    const ctx = tela.getContext("2d");
+
+    const CENTRO_X = tela.width / 2;
+    const CENTRO_Y = tela.height / 2;
+
+    // Definição das cores base do verde
+    const VERDE_ESCURO = '#4d7c0f'; // Usado no botão e texto de instrução
+    const VERDE_MEDIO = '#617342'; // Usado no estado do microfone
+    const VERDE_CLARO_HSL_HUE = 85; // Hue para tons de verde
+    const VERDE_CLARISSIMO = '#e0f5d4'; // Um tom ainda mais claro ou quase branco para a esfera central
+
+    let micLigado = false;
+    let fluxo, audioContext, analisador, dadosFrequencia;
+    let animationFrameId;
+
+    function atualizarUI() {
+      estadoMic.textContent = `Microfone ${micLigado ? 'ligado' : 'desligado'}`;
+      botaoMic.textContent = `${micLigado ? 'Desligar' : 'Ligar'} microfone`;
+    }
+
+    // Desenha o estado inicial (microfone desligado)
+    function desenharEstadoInicial() {
+        ctx.clearRect(0, 0, tela.width, tela.height);
+        // Desenha um ícone de microfone simples quando desligado
+        ctx.strokeStyle = VERDE_ESCURO;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(CENTRO_X - 10, CENTRO_Y - 20, 20, 30, [10]);
+        ctx.moveTo(CENTRO_X, CENTRO_Y + 10);
+        ctx.lineTo(CENTRO_X, CENTRO_Y + 25);
+        ctx.moveTo(CENTRO_X - 15, CENTRO_Y + 25);
+        ctx.lineTo(CENTRO_X + 15, CENTRO_Y + 25);
+        ctx.stroke();
+    }
+
+    function animar() {
+      if (!micLigado) return;
+
+      analisador.getByteFrequencyData(dadosFrequencia);
+
+      // Limpa a tela com um rastro mais sutil usando branco e uma transparência baixa
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'; // Branco com baixa opacidade
+      ctx.fillRect(0, 0, tela.width, tela.height);
+
+      const numSegmentos = 64; // Reduzido para uma forma mais "orgânica"
+      const raioMinimo = 40;  // Raio base da forma
+      const sensibilidade = 0.5; // Ajusta o quanto a forma reage ao som (0.1 a 1.0)
+
+      ctx.beginPath();
+      
+      // Desenha o primeiro ponto fora do loop para fechar a forma corretamente
+      const primeiraAmplitude = dadosFrequencia[0];
+      const primeiroRaio = raioMinimo + (primeiraAmplitude * sensibilidade);
+      ctx.moveTo(CENTRO_X + primeiroRaio, CENTRO_Y);
+
+      for (let i = 0; i < numSegmentos; i++) {
+        const indiceFrequencia = Math.floor(i * (dadosFrequencia.length / numSegmentos));
+        const amplitude = dadosFrequencia[indiceFrequencia];
+        
+        // Calcula o raio para este segmento
+        const raioSegmento = raioMinimo + (amplitude * sensibilidade);
+        
+        // Calcula o ângulo para este segmento
+        const angulo = (i / numSegmentos) * Math.PI * 2;
+        
+        // Converte coordenadas polares para cartesianas
+        const x = CENTRO_X + Math.cos(angulo) * raioSegmento;
+        const y = CENTRO_Y + Math.sin(angulo) * raioSegmento;
+        
+        // Desenha uma linha até este ponto
+        ctx.lineTo(x, y);
+
+        if (amplitude > 150) { // Se a amplitude for alta
+            ctx.beginPath();
+            ctx.arc(x, y, 2 + (amplitude/255)*3, 0, Math.PI * 2); // Um pequeno brilho
+            ctx.fillStyle = VERDE_CLARISSIMO;
+            ctx.fill();
+        }
+      }
+      
+      ctx.closePath(); // Fecha a forma conectando o último ponto ao primeiro
+
+      // Estilo da forma principal
+      const volumeGeral = dadosFrequencia.reduce((a, b) => a + b) / dadosFrequencia.length;
+      const brilhoLinha = 50 + (volumeGeral / 255) * 50; // Mais volume = linha mais brilhante
+      const corLinhaHSL = `hsl(${VERDE_CLARO_HSL_HUE}, 80%, ${brilhoLinha}%)`;
+
+      ctx.strokeStyle = corLinhaHSL;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Esfera central pulsante
+      const raioOrb = 15 + (volumeGeral / 255) * 20;
+      ctx.beginPath();
+      ctx.arc(CENTRO_X, CENTRO_Y, raioOrb, 0, Math.PI * 2);
+      ctx.fillStyle = VERDE_CLARISSIMO; // Esfera central quase branca
+      ctx.fill();
+
+      animationFrameId = requestAnimationFrame(animar);
+    }
+
+    async function toggleMic() {
+      if (micLigado) {
+        fluxo.getTracks().forEach(track => track.stop());
+        if (audioContext && audioContext.state !== 'closed') {
+          audioContext.close();
+        }
+        cancelAnimationFrame(animationFrameId);
+        micLigado = false;
+        desenharEstadoInicial();
+      } else {
+        try {
+          fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioContext = new AudioContext();
+          const fonte = audioContext.createMediaStreamSource(fluxo);
+          analisador = audioContext.createAnalyser();
+          analisador.fftSize = 512;
+          
+          fonte.connect(analisador);
+          dadosFrequencia = new Uint8Array(analisador.frequencyBinCount);
+          
+          micLigado = true;
+          animar();
+        } catch (err) {
+          console.error("Erro ao acessar o microfone:", err);
+          alert("Não foi possível usar o microfone.");
+          return;
+        }
+      }
+      atualizarUI();
+    }
+
+    desenharEstadoInicial();
+    atualizarUI();
+    botaoMic.addEventListener("click", toggleMic);
+
+    // --- DESENHO P5.JS ---
+    let cores = ['blue', 'orange', 'black', 'green', 'red'];
+    let corSelecionada = null;
+    let desenhos = [];
+
+    function setup() {
+      const canvas = createCanvas(650, 300);
+      canvas.parent('canvas-container');
+      background(255);
+      desenharPaleta();
+
+      const clearBtn = document.getElementById('clear-btn');
+      clearBtn.addEventListener('click', () => {
+        desenhos = [];
+        background(255);
+        desenharPaleta();
+      });
+    }
+
+    function draw() {
+      background(255);
+      for (let d of desenhos) {
+        stroke(d.cor);
+        strokeWeight(8);
+        noFill();
+        beginShape();
+        for (let p of d.pontos) vertex(p.x, p.y);
+        endShape();
+      }
+      desenharPaleta();
+    }
+
+    function desenharPaleta() {
+      const tamanho = 35;
+      for (let i = 0; i < cores.length; i++) {
+        fill(cores[i]);
+        noStroke();
+        ellipse(width - 40, 40 + i * 50, tamanho, tamanho);
+        if (corSelecionada === cores[i]) {
+          stroke(50);
+          strokeWeight(2);
+          noFill();
+          ellipse(width - 40, 40 + i * 50, tamanho + 10, tamanho + 10);
+        }
+      }
+    }
+
+    function mousePressed() {
+      for (let i = 0; i < cores.length; i++) {
+        let d = dist(mouseX, mouseY, width - 40, 40 + i * 50);
+        if (d < 20) {
+          corSelecionada = cores[i];
+          return;
+        }
+      }
+      if (mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height && corSelecionada) {
+        desenhos.push({ cor: corSelecionada, pontos: [] });
+      }
+    }
+
+    function mouseDragged() {
+      if (mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height && corSelecionada) {
+        let atual = desenhos[desenhos.length - 1];
+        if (atual) {
+          atual.pontos.push({ x: mouseX, y: mouseY });
+        }
+      }
+    }
+  </script>
+</body>
+</html>
