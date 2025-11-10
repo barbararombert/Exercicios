@@ -377,7 +377,11 @@
       // Paredes internas
       { x: 50,  y: 100, w: 300, h: 10 },
       { x: 50,  y: 100, w: 10,  h: 200 },
-      { x: 90,  y: 290, w: 270, h: 10 },
+
+      /* parede de baixo com ABERTURA para a moeda do meio */
+      { x: 90,  y: 290, w: 120, h: 10 },
+      { x: 280, y: 290, w: 80,  h: 10 },
+
       { x: 90,  y: 150, w: 10,  h: 150 },
       { x: 140, y: 150, w: 210, h: 10 },
       { x: 340, y: 150, w: 10,  h: 150 },
@@ -419,7 +423,7 @@
     function resetGame() {
       player.x = 40;
       player.y = 560;
-      coins.forEach(c => c.collected = false);
+      coins.forEach(c => (c.collected = false));
       exitDoor.active = false;
       lastTime = 0;
       statusEl.textContent = gameStarted
@@ -431,8 +435,10 @@
     // Pedir permissão para usar o sensor em iOS / alguns browsers
     async function enableOrientation() {
       try {
-        if (typeof DeviceOrientationEvent !== "undefined" &&
-            typeof DeviceOrientationEvent.requestPermission === "function") {
+        if (
+          typeof DeviceOrientationEvent !== "undefined" &&
+          typeof DeviceOrientationEvent.requestPermission === "function"
+        ) {
           const response = await DeviceOrientationEvent.requestPermission();
           if (response === "granted") {
             window.addEventListener("deviceorientation", handleOrientation);
@@ -440,7 +446,8 @@
             sensorsEnabled = true;
             gameStarted = true;
           } else {
-            statusEl.textContent = "Permissão negada. Não é possível usar o sensor de movimento.";
+            statusEl.textContent =
+              "Permissão negada. Não é possível usar o sensor de movimento.";
           }
         } else {
           // Android / outros
@@ -477,7 +484,7 @@
       const closestY = Math.max(rect.y, Math.min(py, rect.y + rect.h));
       const dx = px - closestX;
       const dy = py - closestY;
-      return (dx * dx + dy * dy) < (pr * pr);
+      return dx * dx + dy * dy < pr * pr;
     }
 
     // Update
@@ -485,18 +492,16 @@
       if (!gameStarted || !sensorsEnabled) return;
 
       // Converter tilt em velocidade
-      const maxSpeed = 4; // px por "frame" (ajuste de sensibilidade)
-      const vx = (tiltX / 45) * maxSpeed; // inclinação de ~45º = velocidade máxima
+      const maxSpeed = 4; // px por "frame"
+      const vx = (tiltX / 45) * maxSpeed;
       const vy = (tiltY / 45) * maxSpeed;
 
-      // Movimento com resolução de colisão separada X/Y
       // Movimento em X
       const oldX = player.x;
       player.x += vx * dt;
-
       for (const wall of walls) {
         if (circleRectCollision(player.x, player.y, player.r, wall)) {
-          player.x = oldX; // anula movimento em X
+          player.x = oldX;
           break;
         }
       }
@@ -504,15 +509,14 @@
       // Movimento em Y
       const oldY = player.y;
       player.y += vy * dt;
-
       for (const wall of walls) {
         if (circleRectCollision(player.x, player.y, player.r, wall)) {
-          player.y = oldY; // anula movimento em Y
+          player.y = oldY;
           break;
         }
       }
 
-      // Limites (só para garantir)
+      // Limites extras
       if (player.x - player.r < 0) player.x = player.r;
       if (player.x + player.r > canvas.width) player.x = canvas.width - player.r;
       if (player.y - player.r < 0) player.y = player.r;
@@ -543,10 +547,12 @@
 
       // Verificar se jogador chegou à porta
       if (exitDoor.active) {
-        const inDoorX = (player.x + player.r > exitDoor.x) &&
-                        (player.x - player.r < exitDoor.x + exitDoor.w);
-        const inDoorY = (player.y + player.r > exitDoor.y) &&
-                        (player.y - player.r < exitDoor.y + exitDoor.h);
+        const inDoorX =
+          player.x + player.r > exitDoor.x &&
+          player.x - player.r < exitDoor.x + exitDoor.w;
+        const inDoorY =
+          player.y + player.r > exitDoor.y &&
+          player.y - player.r < exitDoor.y + exitDoor.h;
         if (inDoorX && inDoorY) {
           alert("Parabéns! Saíste do labirinto! O jogo vai recomeçar.");
           resetGame();
@@ -558,10 +564,14 @@
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Fundo com leve gradiente já vem do CSS, mas reforçamos com um brilho no centro
+      // Fundo
       const g = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 3, 10,
-        canvas.width / 2, canvas.height / 3, 260
+        canvas.width / 2,
+        canvas.height / 3,
+        10,
+        canvas.width / 2,
+        canvas.height / 3,
+        260
       );
       g.addColorStop(0, "rgba(15, 23, 42, 0.2)");
       g.addColorStop(1, "rgba(0, 0, 0, 1)");
@@ -574,7 +584,6 @@
         ctx.fillRect(w.x, w.y, w.w, w.h);
       });
 
-      // Bordas luminosas das paredes
       ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
       ctx.lineWidth = 1;
       walls.forEach(w => {
@@ -587,8 +596,12 @@
           ctx.beginPath();
           ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
           const coinGrad = ctx.createRadialGradient(
-            c.x - 3, c.y - 3, 2,
-            c.x, c.y, c.r + 4
+            c.x - 3,
+            c.y - 3,
+            2,
+            c.x,
+            c.y,
+            c.r + 4
           );
           coinGrad.addColorStop(0, "#fef9c3");
           coinGrad.addColorStop(0.5, "#facc15");
@@ -599,7 +612,6 @@
           ctx.strokeStyle = "rgba(15, 23, 42, 0.9)";
           ctx.stroke();
 
-          // brilho
           ctx.beginPath();
           ctx.arc(c.x - 3, c.y - 3, 2, 0, Math.PI * 2);
           ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
@@ -609,8 +621,10 @@
 
       // Porta
       const doorGrad = ctx.createLinearGradient(
-        exitDoor.x, exitDoor.y,
-        exitDoor.x + exitDoor.w, exitDoor.y + exitDoor.h
+        exitDoor.x,
+        exitDoor.y,
+        exitDoor.x + exitDoor.w,
+        exitDoor.y + exitDoor.h
       );
       if (exitDoor.active) {
         doorGrad.addColorStop(0, "#22c55e");
@@ -625,10 +639,15 @@
       ctx.lineWidth = 2;
       ctx.strokeRect(exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h);
 
-      // Pequeno “brilho” na porta quando ativa
       if (exitDoor.active) {
         ctx.beginPath();
-        ctx.arc(exitDoor.x + exitDoor.w / 2, exitDoor.y + exitDoor.h / 2, 6, 0, Math.PI * 2);
+        ctx.arc(
+          exitDoor.x + exitDoor.w / 2,
+          exitDoor.y + exitDoor.h / 2,
+          6,
+          0,
+          Math.PI * 2
+        );
         ctx.fillStyle = "rgba(190, 242, 100, 0.6)";
         ctx.fill();
       }
@@ -637,8 +656,12 @@
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
       const pGrad = ctx.createRadialGradient(
-        player.x - 4, player.y - 4, 2,
-        player.x, player.y, player.r + 6
+        player.x - 4,
+        player.y - 4,
+        2,
+        player.x,
+        player.y,
+        player.r + 6
       );
       pGrad.addColorStop(0, "#e0f2fe");
       pGrad.addColorStop(0.4, "#38bdf8");
@@ -649,7 +672,6 @@
       ctx.strokeStyle = "rgba(15, 23, 42, 0.95)";
       ctx.stroke();
 
-      // Halo suave
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.r + 8, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
@@ -660,7 +682,7 @@
     // Loop
     function loop(timestamp) {
       if (!lastTime) lastTime = timestamp;
-      const dt = (timestamp - lastTime) / 16.67; // ~ normalizar para 60fps
+      const dt = (timestamp - lastTime) / 16.67; // ~60fps normalizado
       lastTime = timestamp;
       update(dt);
       draw();
